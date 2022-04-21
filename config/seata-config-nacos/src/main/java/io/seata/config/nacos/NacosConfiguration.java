@@ -79,6 +79,7 @@ public class NacosConfiguration extends AbstractConfiguration {
      * @see io.seata.config.nacos.NacosConfiguration#getInstance
      * 在构造中初始化 nacos-config-service
      * @see com.alibaba.nacos.client.config.NacosConfigService
+     * 用来获取 nacos 上的配置信息
      */
     private static volatile ConfigService configService;
     private static final int MAP_INITIAL_CAPACITY = 8;

@@ -24,6 +24,15 @@ import static io.seata.spring.boot.autoconfigure.StarterConstants.SEATA_PREFIX;
 
 /**
  * @author xingfudeshi@gmail.com
+ * seata-client相关配置
+ * 示例
+ * seata:
+ *   tx-service-group: ${spring.application.name}
+ *   service:
+ *     # disableGlobalTransaction: true
+ *     vgroup-mapping:
+ *       lc-menzhenjz: default
+ *
  */
 @Component
 @ConfigurationProperties(prefix = SEATA_PREFIX)

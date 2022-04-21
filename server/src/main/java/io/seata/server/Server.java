@@ -41,6 +41,7 @@ import java.util.concurrent.TimeUnit;
  * @author slievrly
  * 1. 加载 registry.conf: 其中定义了 seata 的注册中心和配置中心
  * 2.
+ * @see io.seata.discovery.registry.RegistryService#PREFIX_SERVICE_MAPPING
  */
 public class Server {
 

@@ -77,6 +77,7 @@ public final class ConfigurationFactory {
 
         Configuration extConfiguration = null;
         try {
+            // seata-spring-boot-starter 代理
             extConfiguration = EnhancedServiceLoader.load(ExtConfigurationProvider.class).provide(configuration);
             if (LOGGER.isInfoEnabled()) {
                 LOGGER.info("load Configuration:{}", extConfiguration == null ? configuration.getClass().getSimpleName()
