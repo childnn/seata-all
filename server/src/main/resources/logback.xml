@@ -32,7 +32,7 @@
     <include resource="logback/console-appender.xml"/>
 
     <!-- file-appender -->
-    <include resource="logback/file-appender.xml"/>
+    <!--<include resource="logback/file-appender.xml"/>-->
 
     <!-- logstash-appender: off by default -->
     <!--<include resource="logback/logstash-appender.xml"/>-->
@@ -40,14 +40,22 @@
     <!-- kafka-appender: off by default -->
     <!--<include resource="logback/kafka-appender.xml"/>-->
 
-    <root level="INFO">
+
+    <turboFilter class="log.MyTurboFilter"/>
+    <logger name="com.alibaba.nacos.common.http.client.NacosRestTemplate" level="TRACE"/>
+    <logger name="com.alibaba.nacos.client.config.impl.ConfigHttpClientManager" level="TRACE"/>
+    <logger name="com.alibaba.nacos.client.config.impl.CacheData" level="TRACE"/>
+    <logger name="com.alibaba.nacos.client.config.impl.ConfigHttpClientManager" level="DEBUG"/>
+    <logger name="com.alibaba.nacos.client.config.impl.ClientWorker" level="DEBUG"/>
+
+    <root level="TRACE">
         <!-- console-appender -->
         <appender-ref ref="CONSOLE"/>
 
         <!-- file-appender -->
-        <appender-ref ref="FILE_ALL"/>
-        <appender-ref ref="FILE_WARN"/>
-        <appender-ref ref="FILE_ERROR"/>
+        <!--<appender-ref ref="FILE_ALL"/>-->
+        <!--<appender-ref ref="FILE_WARN"/>-->
+        <!--<appender-ref ref="FILE_ERROR"/>-->
 
         <!-- logstash-appender: off by default -->
         <!--<appender-ref ref="LOGSTASH"/>-->

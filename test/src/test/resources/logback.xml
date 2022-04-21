@@ -18,12 +18,17 @@
 <configuration>
 	<!-- Console output log -->
 	<appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
-		<layout class="ch.qos.logback.classic.PatternLayout">
+		<!-- 默认的 encoder, class 属性可以省略 -->
+		<encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
+			<pattern>%date [SEATA] [%thread] %-5level %logger{80} - %msg%n</pattern>
+		</encoder>
+		<!-- deprecated -->
+		<!--<layout class="ch.qos.logback.classic.PatternLayout">
 			<Pattern>%date [SEATA] [%thread] %-5level %logger{80} - %msg%n</Pattern>
-		</layout>
+		</layout>-->
 	</appender>
 
-	<root level="INFO">
+	<root level="TRACE">
 		<appender-ref ref="STDOUT" />
 	</root>
 </configuration>

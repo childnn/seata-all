@@ -15,13 +15,13 @@
  */
 package io.seata.metrics.registry;
 
-import java.util.Objects;
-
 import io.seata.common.exception.NotSupportYetException;
 import io.seata.common.loader.EnhancedServiceLoader;
 import io.seata.common.util.StringUtils;
 import io.seata.config.ConfigurationFactory;
 import io.seata.core.constants.ConfigurationKeys;
+
+import java.util.Objects;
 
 /**
  * Registry Factory for load configured metrics registry
@@ -29,10 +29,15 @@ import io.seata.core.constants.ConfigurationKeys;
  * @author zhengyangyong
  */
 public class RegistryFactory {
+
     public static Registry getInstance() {
         RegistryType registryType;
+
+        // 默认 compact
         String registryTypeName = ConfigurationFactory.getInstance().getConfig(
-            ConfigurationKeys.METRICS_PREFIX + ConfigurationKeys.METRICS_REGISTRY_TYPE, null);
+            ConfigurationKeys.METRICS_PREFIX + // metrics.
+                    ConfigurationKeys.METRICS_REGISTRY_TYPE, // registryType
+                null);
         if (!StringUtils.isNullOrEmpty(registryTypeName)) {
             try {
                 registryType = RegistryType.getType(registryTypeName);

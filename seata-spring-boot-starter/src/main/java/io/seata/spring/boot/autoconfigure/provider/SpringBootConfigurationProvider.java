@@ -15,12 +15,6 @@
  */
 package io.seata.spring.boot.autoconfigure.provider;
 
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
-import java.util.Map;
-import java.util.Optional;
-import java.util.stream.Stream;
-
 import io.seata.common.exception.ShouldNeverHappenException;
 import io.seata.common.holder.ObjectHolder;
 import io.seata.config.Configuration;
@@ -29,16 +23,16 @@ import org.apache.commons.lang.StringUtils;
 import org.springframework.beans.factory.NoSuchBeanDefinitionException;
 import org.springframework.cglib.proxy.Enhancer;
 import org.springframework.cglib.proxy.MethodInterceptor;
-import org.springframework.cglib.proxy.MethodProxy;
 import org.springframework.context.ApplicationContext;
 
-import static io.seata.common.Constants.OBJECT_KEY_SPRING_APPLICATION_CONTEXT;
-import static io.seata.common.util.StringFormatUtils.DOT;
-import static io.seata.spring.boot.autoconfigure.StarterConstants.PROPERTY_BEAN_MAP;
-import static io.seata.spring.boot.autoconfigure.StarterConstants.SEATA_PREFIX;
-import static io.seata.spring.boot.autoconfigure.StarterConstants.SERVICE_PREFIX;
-import static io.seata.spring.boot.autoconfigure.StarterConstants.SPECIAL_KEY_GROUPLIST;
-import static io.seata.spring.boot.autoconfigure.StarterConstants.SPECIAL_KEY_VGROUP_MAPPING;
+import java.lang.reflect.Field;
+import java.util.Map;
+import java.util.Optional;
+import java.util.stream.Stream;
+
+import static io.seata.common.Constants.*;
+import static io.seata.common.util.StringFormatUtils.*;
+import static io.seata.spring.boot.autoconfigure.StarterConstants.*;
 
 /**
  * @author xingfudeshi@gmail.com
@@ -48,31 +42,28 @@ public class SpringBootConfigurationProvider implements ExtConfigurationProvider
 
     @Override
     public Configuration provide(Configuration originalConfiguration) {
-        return (Configuration) Enhancer.create(originalConfiguration.getClass(), new MethodInterceptor() {
-            @Override
-            public Object intercept(Object proxy, Method method, Object[] args, MethodProxy methodProxy)
-                throws Throwable {
-                if (method.getName().startsWith(INTERCEPT_METHOD_PREFIX) && args.length > 0) {
-                    Object result = null;
-                    String rawDataId = (String) args[0];
-                    if (args.length == 1) {
-                        result = get(convertDataId(rawDataId));
-                    } else if (args.length == 2) {
-                        result = get(convertDataId(rawDataId), args[1]);
-                    } else if (args.length == 3) {
-                        result = get(convertDataId(rawDataId), args[1], (Long) args[2]);
-                    }
-                    if (result != null) {
-                        //If the return type is String,need to convert the object to string
-                        if (method.getReturnType().equals(String.class)) {
-                            return String.valueOf(result);
-                        }
-                        return result;
-                    }
+        return (Configuration) Enhancer.create(originalConfiguration.getClass(), (MethodInterceptor) (proxy, method, args, methodProxy) -> {
+            // io.seata.config.Configuration 的各种 get 方法
+            if (method.getName().startsWith(INTERCEPT_METHOD_PREFIX) && args.length > 0) {
+                Object result = null;
+                String rawDataId = (String) args[0];
+                if (args.length == 1) {
+                    result = get(convertDataId(rawDataId));
+                } else if (args.length == 2) {
+                    result = get(convertDataId(rawDataId), args[1]);
+                } else if (args.length == 3) {
+                    result = get(convertDataId(rawDataId), args[1], (Long) args[2]);
                 }
-
-                return method.invoke(originalConfiguration, args);
+                if (result != null) {
+                    //If the return type is String,need to convert the object to string
+                    if (method.getReturnType().equals(String.class)) {
+                        return String.valueOf(result);
+                    }
+                    return result;
+                }
             }
+
+            return method.invoke(originalConfiguration, args);
         });
     }
 

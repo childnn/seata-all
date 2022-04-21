@@ -219,6 +219,9 @@ public class CollectionUtils {
      * @return the value
      */
     public static <K, V> V computeIfAbsent(Map<K, V> map, K key, Function<? super K, ? extends V> mappingFunction) {
+        // todo: 没太理解为什么要这样封装?
+        // java.util.Map.computeIfAbsent 不是已经包含以下步骤了吗?
+        // 只是为了如注释所说, 在使用 ConcurrentHashMap 时不会加锁吗?
         V value = map.get(key);
         if (value != null) {
             return value;
@@ -231,6 +234,7 @@ public class CollectionUtils {
      *
      * @param sourceList the source list
      * @return the list
+     * @see String#toUpperCase()
      */
     public static List<String> toUpperList(List<String> sourceList) {
         if (isEmpty(sourceList)) {
@@ -272,6 +276,7 @@ public class CollectionUtils {
 
             try {
                 return list.get(size - 1);
+                // 并发情况下可能会 IOBE
             } catch (IndexOutOfBoundsException ex) {
                 // catch the exception and continue to retry
             }

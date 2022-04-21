@@ -25,6 +25,9 @@ import java.lang.annotation.Target;
  * The interface Load level.
  *
  * @author slievrly
+ * 解析 META-INF.services 下的配置用到
+ * @see EnhancedServiceLoader.InnerEnhancedServiceLoader#getUnloadedExtensionDefinition(java.lang.String, java.lang.ClassLoader)
+ * 标注 service-class 的实现
  */
 @Documented
 @Retention(RetentionPolicy.RUNTIME)

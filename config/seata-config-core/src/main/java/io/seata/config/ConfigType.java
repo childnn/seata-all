@@ -19,38 +19,48 @@ package io.seata.config;
  * The enum Config type.
  *
  * @author slievrly
+ * registry.conf 中的 config.type 类型
+ * 设置不区分大小写
  */
 public enum ConfigType {
     /**
      * File config type.
+     * @see FileConfiguration
      */
     File,
     /**
      * zookeeper config type.
+     * @see io.seata.config.zk.ZookeeperConfiguration
      */
     ZK,
     /**
      * Nacos config type.
+     * @see io.seata.config.nacos.NacosConfiguration
      */
     Nacos,
     /**
      * Apollo config type.
+     * @see io.seata.config.apollo.ApolloConfiguration
      */
     Apollo,
     /**
      * Consul config type
+     * @see io.seata.config.consul.ConsulConfiguration
      */
     Consul,
     /**
      * Etcd3 config type
+     * @see io.seata.config.etcd3.EtcdConfiguration
      */
     Etcd3,
     /**
      * spring cloud config type
+     * @see io.seata.config.springcloud.SpringCloudConfiguration
      */
     SpringCloudConfig,
     /**
      * Custom config type
+     * 自定义, 实现 {@link AbstractConfiguration}
      */
     Custom;
 
@@ -61,8 +71,9 @@ public enum ConfigType {
      * @return the type
      */
     public static ConfigType getType(String name) {
+        // ConfigType[] enumConstants = ConfigType.class.getEnumConstants();
         for (ConfigType configType : values()) {
-            if (configType.name().equalsIgnoreCase(name)) {
+            if (configType.name().equalsIgnoreCase(name)) { // ignore case
                 return configType;
             }
         }

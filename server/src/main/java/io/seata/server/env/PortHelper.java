@@ -28,6 +28,7 @@ public class PortHelper {
         if (ContainerHelper.isRunningInContainer()) {
             return ContainerHelper.getPort();
         } else if (args != null && args.length >= 2) {
+            // -p 8091
             for (int i = 0; i < args.length; ++i) {
                 if ("-p".equalsIgnoreCase(args[i]) && i < args.length - 1) {
                     return NumberUtils.toInt(args[i + 1], SERVER_DEFAULT_PORT);

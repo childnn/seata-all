@@ -22,7 +22,7 @@ import io.seata.config.ConfigurationProvider;
 /**
  * @author xingfudeshi@gmail.com
  */
-@LoadLevel(name = "Nacos", order = 1)
+@LoadLevel(name = "Nacos", order = 1) // ConfigType.Nacos.name()
 public class NacosConfigurationProvider implements ConfigurationProvider {
     @Override
     public Configuration provide() {

@@ -15,6 +15,16 @@
  */
 package io.seata.config;
 
+import io.netty.util.internal.ConcurrentSet;
+import io.seata.common.thread.NamedThreadFactory;
+import io.seata.common.util.CollectionUtils;
+import io.seata.common.util.StringUtils;
+import io.seata.config.ConfigFuture.ConfigOperation;
+import io.seata.config.file.FileConfig;
+import org.apache.commons.lang.ObjectUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.File;
 import java.io.UnsupportedEncodingException;
 import java.net.URL;
@@ -30,16 +40,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-
-import io.netty.util.internal.ConcurrentSet;
-import io.seata.common.thread.NamedThreadFactory;
-import io.seata.common.util.CollectionUtils;
-import io.seata.common.util.StringUtils;
-import io.seata.config.ConfigFuture.ConfigOperation;
-import io.seata.config.file.FileConfig;
-import org.apache.commons.lang.ObjectUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * The type FileConfiguration.
@@ -58,7 +58,7 @@ public class FileConfiguration extends AbstractConfiguration {
 
     private static final int MAX_CONFIG_OPERATE_THREAD = 2;
 
-    private static final long LISTENER_CONFIG_INTERVAL = 1 * 1000;
+    private static final long LISTENER_CONFIG_INTERVAL = 1L * 1000;
 
     private static final String REGISTRY_TYPE = "file";
 
@@ -78,6 +78,10 @@ public class FileConfiguration extends AbstractConfiguration {
     private final FileListener fileListener = new FileListener();
 
     private final boolean allowDynamicRefresh;
+
+    public FileConfig getFileConfig() {
+        return fileConfig;
+    }
 
     /**
      * Note that:this constructor is only used to create proxy with CGLIB
@@ -105,13 +109,13 @@ public class FileConfiguration extends AbstractConfiguration {
      * @param allowDynamicRefresh the allow dynamic refresh
      */
     public FileConfiguration(String name, boolean allowDynamicRefresh) {
-        LOGGER.info("The file name of the operation is {}", name);
+        LOGGER.info("The file name of the operation is [{}]", name);
         File file = getConfigFile(name);
         if (file == null) {
             targetFilePath = null;
         } else {
             targetFilePath = file.getPath();
-            fileConfig = FileConfigFactory.load(file, name);
+            fileConfig = FileConfigFactory.load(file, name); // load: seata-config-core META-INF/services io.seata.config.file.FileConfig
         }
         /*
          * For seata-server side the conf file should always exists.
@@ -131,16 +135,24 @@ public class FileConfiguration extends AbstractConfiguration {
                 new NamedThreadFactory("configOperate", MAX_CONFIG_OPERATE_THREAD));
     }
 
+    /**
+     *  getConfigFile: default is "registry"
+     *  file-suffix: yml/conf/properties
+     * @see io.seata.config.FileConfigFactory#SUFFIX_MAP
+     */
     private File getConfigFile(String name) {
         try {
             if (name == null) {
                 throw new IllegalArgumentException("name can't be null");
             }
 
+            // 是否为系统文件: file: 协议
             boolean filePathCustom = name.startsWith(SYS_FILE_RESOURCE_PREFIX);
             String filePath = filePathCustom ? name.substring(SYS_FILE_RESOURCE_PREFIX.length()) : name;
             String decodedPath = URLDecoder.decode(filePath, StandardCharsets.UTF_8.name());
 
+            // 后缀拼接: io.seata.config.FileConfigFactory.SUFFIX_MAP
+            // registry.conf/properties/yml
             File targetFile = getFileFromFileSystem(decodedPath);
             if (targetFile != null) {
                 if (LOGGER.isInfoEnabled()) {

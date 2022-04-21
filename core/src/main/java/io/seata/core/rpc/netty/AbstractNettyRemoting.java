@@ -106,21 +106,18 @@ public abstract class AbstractNettyRemoting implements Disposable {
     protected final List<RpcHook> rpcHooks = EnhancedServiceLoader.loadAll(RpcHook.class);
 
     public void init() {
-        timerExecutor.scheduleAtFixedRate(new Runnable() {
-            @Override
-            public void run() {
-                for (Map.Entry<Integer, MessageFuture> entry : futures.entrySet()) {
-                    if (entry.getValue().isTimeout()) {
-                        futures.remove(entry.getKey());
-                        entry.getValue().setResultMessage(null);
-                        if (LOGGER.isDebugEnabled()) {
-                            LOGGER.debug("timeout clear future: {}", entry.getValue().getRequestMessage().getBody());
-                        }
+        timerExecutor.scheduleAtFixedRate(() -> {
+            for (Map.Entry<Integer, MessageFuture> entry : futures.entrySet()) {
+                if (entry.getValue().isTimeout()) {
+                    futures.remove(entry.getKey());
+                    entry.getValue().setResultMessage(null);
+                    if (LOGGER.isDebugEnabled()) {
+                        LOGGER.debug("timeout clear future: {}", entry.getValue().getRequestMessage().getBody());
                     }
                 }
-
-                nowMills = System.currentTimeMillis();
             }
+
+            nowMills = System.currentTimeMillis();
         }, TIMEOUT_CHECK_INTERNAL, TIMEOUT_CHECK_INTERNAL, TimeUnit.MILLISECONDS);
     }
 

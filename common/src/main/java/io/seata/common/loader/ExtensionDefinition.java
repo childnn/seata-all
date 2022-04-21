@@ -21,12 +21,14 @@ import io.seata.common.util.StringUtils;
  * The type ExtensionDefinition
  *
  * @author haozhibei
+ * 封装 {@link LoadLevel} 注解属性对象
+ * @see EnhancedServiceLoader.InnerEnhancedServiceLoader#getUnloadedExtensionDefinition(java.lang.String, java.lang.ClassLoader)
  */
 final class ExtensionDefinition {
-    private String name;
-    private Class serviceClass;
-    private Integer order;
-    private Scope scope;
+    private final String name;
+    private final Class serviceClass; // service 实现类全限定名: 文件中定义的一行数据 (line)
+    private final Integer order;
+    private final Scope scope;
 
     public Integer getOrder() {
         return this.order;

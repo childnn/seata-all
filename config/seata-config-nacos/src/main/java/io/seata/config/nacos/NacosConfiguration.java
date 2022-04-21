@@ -15,6 +15,23 @@
  */
 package io.seata.config.nacos;
 
+import com.alibaba.nacos.api.NacosFactory;
+import com.alibaba.nacos.api.config.ConfigService;
+import com.alibaba.nacos.api.config.listener.AbstractSharedListener;
+import com.alibaba.nacos.api.exception.NacosException;
+import com.alibaba.nacos.client.config.NacosConfigService;
+import io.seata.common.exception.NotSupportYetException;
+import io.seata.common.util.CollectionUtils;
+import io.seata.common.util.StringUtils;
+import io.seata.config.AbstractConfiguration;
+import io.seata.config.Configuration;
+import io.seata.config.ConfigurationChangeEvent;
+import io.seata.config.ConfigurationChangeListener;
+import io.seata.config.ConfigurationFactory;
+import io.seata.config.ConfigurationKeys;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -28,28 +45,16 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
-import com.alibaba.nacos.api.NacosFactory;
-import com.alibaba.nacos.api.config.ConfigService;
-import com.alibaba.nacos.api.config.listener.AbstractSharedListener;
-import com.alibaba.nacos.api.exception.NacosException;
-
-import io.seata.common.exception.NotSupportYetException;
-import io.seata.common.util.CollectionUtils;
-import io.seata.common.util.StringUtils;
-import io.seata.config.AbstractConfiguration;
-import io.seata.config.Configuration;
-import io.seata.config.ConfigurationChangeEvent;
-import io.seata.config.ConfigurationChangeListener;
-import io.seata.config.ConfigurationFactory;
-import io.seata.config.ConfigurationKeys;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 
 /**
  * The type Nacos configuration.
  *
  * @author slievrly
+ * 获取 dataId 属性值的顺序
+ * @see #getLatestConfig(String, String, long)
+ * 1. SystemProperties
+ * 2. seataConfig: registry.conf 中定义的 conf.nacos.dataId 属性名指定的文件
+ * 3. 从 nacos 注册中心获取: 本地缓存或者远程
  */
 public class NacosConfiguration extends AbstractConfiguration {
     private static volatile NacosConfiguration instance;
@@ -68,11 +73,20 @@ public class NacosConfiguration extends AbstractConfiguration {
     private static final String PASSWORD = "password";
     private static final String ACCESS_KEY = "accessKey";
     private static final String SECRET_KEY = "secretKey";
+    // registry.conf 文件的内容
     private static final Configuration FILE_CONFIG = ConfigurationFactory.CURRENT_FILE_INSTANCE;
+    /**
+     * @see io.seata.config.nacos.NacosConfiguration#getInstance
+     * 在构造中初始化 nacos-config-service
+     * @see com.alibaba.nacos.client.config.NacosConfigService
+     */
     private static volatile ConfigService configService;
     private static final int MAP_INITIAL_CAPACITY = 8;
     private static final ConcurrentMap<String, ConcurrentMap<ConfigurationChangeListener, NacosListener>> CONFIG_LISTENERS_MAP
             = new ConcurrentHashMap<>(MAP_INITIAL_CAPACITY);
+    // 加载 registry.conf 中定义的 config.nacos.dataId 对应属性值
+    // 该值表示了 nacos 注册中心的一个配置文件, 此配置文件定义了 TC 的一些配置
+    // 文件名默认为 seata.properties
     private static volatile Properties seataConfig = new Properties();
 
     /**
@@ -92,12 +106,17 @@ public class NacosConfiguration extends AbstractConfiguration {
     }
 
     /**
-     * Instantiates a new Nacos configuration.
+     * 1. Instantiates a new Nacos configuration.
+     * 2. 构建 {@link com.alibaba.nacos.client.config.NacosConfigService}
+     * 3. init seata config
      */
     private NacosConfiguration() {
         if (configService == null) {
             try {
+                // nacos 注册中心的配置
+                // nacos: com.alibaba.nacos.client.config.NacosConfigService 实例
                 configService = NacosFactory.createConfigService(getConfigProperties());
+                // init #seataConfig,
                 initSeataConfig();
             } catch (NacosException e) {
                 throw new RuntimeException(e);
@@ -107,19 +126,30 @@ public class NacosConfiguration extends AbstractConfiguration {
 
     @Override
     public String getLatestConfig(String dataId, String defaultValue, long timeoutMills) {
-        String value = getConfigFromSysPro(dataId);
+        String value = getConfigFromSysPro(dataId); // 先从 sys-prop 获取
         if (value != null) {
+            // 系统有定义, 直接返回
+            LOGGER.info("[getLatestConfig]从System-properties获取 dataId: [{}] 配置为: [{}]", dataId, value);
             return value;
         }
 
+        // 再从 #seataConfig 获取, 实际就是加载的 registry.conf 中定义的 config.nacos.dataId 对应属性值
+        // 该值表示了 nacos 注册中心的一个配置文件
         value = seataConfig.getProperty(dataId);
 
+        // 如果以上都为定义
         if (null == value) {
             try {
+                // 从 nacos 注册中心获取配置: 可能是本地的缓存, 或者 HTTP 请求远程获取
+                // nacos-group: 默认 DEFAULT_GROUP, 或者自定义
                 value = configService.getConfig(dataId, getNacosGroup(), timeoutMills);
+                LOGGER.info("[getLatestConfig]利用 nacos-config-service(com.alibaba.nacos.client.config.NacosConfigService) " +
+                        "获取到的 dataId: [{}] 属性值: [{}]", dataId, value);
             } catch (NacosException exx) {
                 LOGGER.error(exx.getErrMsg());
             }
+        } else {
+            LOGGER.info("[getLatestConfig]从 seata-config 获取到的 dataId: [{}] 值为: [{}]", dataId, value);
         }
 
         return value == null ? defaultValue : value;
@@ -211,21 +241,29 @@ public class NacosConfiguration extends AbstractConfiguration {
         }
     }
 
+    /**
+     * @see #FILE_CONFIG {@link ConfigurationFactory#CURRENT_FILE_INSTANCE} 默认情况实际就是 registry.conf 内容
+     * 构建 {@link NacosConfigService} 的构造参数.
+     * 主要属性: namespace
+     */
     private static Properties getConfigProperties() {
         Properties properties = new Properties();
-        if (System.getProperty(ENDPOINT_KEY) != null) {
+
+        // server-addr
+        if (System.getProperty(ENDPOINT_KEY) != null) { // endpoint
             properties.setProperty(ENDPOINT_KEY, System.getProperty(ENDPOINT_KEY));
             properties.put(ACCESS_KEY, Objects.toString(System.getProperty(ACCESS_KEY), ""));
             properties.put(SECRET_KEY, Objects.toString(System.getProperty(SECRET_KEY), ""));
-        } else if (System.getProperty(PRO_SERVER_ADDR_KEY) != null) {
+        } else if (System.getProperty(PRO_SERVER_ADDR_KEY) != null) { // serverAddr
             properties.setProperty(PRO_SERVER_ADDR_KEY, System.getProperty(PRO_SERVER_ADDR_KEY));
         } else {
-            String address = FILE_CONFIG.getConfig(getNacosAddrFileKey());
+            String address = FILE_CONFIG.getConfig(getNacosAddrFileKey()); // config.nacos.serverAddr
             if (address != null) {
                 properties.setProperty(PRO_SERVER_ADDR_KEY, address);
             }
         }
 
+        // namespace
         if (System.getProperty(PRO_NAMESPACE_KEY) != null) {
             properties.setProperty(PRO_NAMESPACE_KEY, System.getProperty(PRO_NAMESPACE_KEY));
         } else {
@@ -235,36 +273,43 @@ public class NacosConfiguration extends AbstractConfiguration {
             }
             properties.setProperty(PRO_NAMESPACE_KEY, namespace);
         }
-        String userName = StringUtils.isNotBlank(System.getProperty(USER_NAME)) ? System.getProperty(USER_NAME)
-                : FILE_CONFIG.getConfig(getNacosUserName());
-        if (StringUtils.isNotBlank(userName)) {
+
+        // username/password
+        String username = StringUtils.isNotBlank(System.getProperty(USER_NAME)) ? System.getProperty(USER_NAME)
+                : FILE_CONFIG.getConfig(getNacosUsername());
+        if (StringUtils.isNotBlank(username)) {
             String password = StringUtils.isNotBlank(System.getProperty(PASSWORD)) ? System.getProperty(PASSWORD)
                     : FILE_CONFIG.getConfig(getNacosPassword());
             if (StringUtils.isNotBlank(password)) {
-                properties.setProperty(USER_NAME, userName);
+                properties.setProperty(USER_NAME, username);
                 properties.setProperty(PASSWORD, password);
             }
         }
         return properties;
     }
 
+    // config.nacos.namespace
     private static String getNacosNameSpaceFileKey() {
         return String.join(ConfigurationKeys.FILE_CONFIG_SPLIT_CHAR, ConfigurationKeys.FILE_ROOT_CONFIG, CONFIG_TYPE, PRO_NAMESPACE_KEY);
     }
 
+    // config.nacos.serverAddr
     private static String getNacosAddrFileKey() {
         return String.join(ConfigurationKeys.FILE_CONFIG_SPLIT_CHAR, ConfigurationKeys.FILE_ROOT_CONFIG, CONFIG_TYPE, PRO_SERVER_ADDR_KEY);
     }
 
+    // config.nacos.group
     private static String getNacosGroupKey() {
         return String.join(ConfigurationKeys.FILE_CONFIG_SPLIT_CHAR, ConfigurationKeys.FILE_ROOT_CONFIG, CONFIG_TYPE, GROUP_KEY);
     }
 
+    // config.nacos.dataId
     private static String getNacosDataIdKey() {
         return String.join(ConfigurationKeys.FILE_CONFIG_SPLIT_CHAR, ConfigurationKeys.FILE_ROOT_CONFIG, CONFIG_TYPE, NACOS_DATA_ID_KEY);
     }
 
-    private static String getNacosUserName() {
+    // config.nacos.username
+    private static String getNacosUsername() {
         return String.join(ConfigurationKeys.FILE_CONFIG_SPLIT_CHAR, ConfigurationKeys.FILE_ROOT_CONFIG, CONFIG_TYPE,
                 USER_NAME);
     }
@@ -274,12 +319,16 @@ public class NacosConfiguration extends AbstractConfiguration {
                 PASSWORD);
     }
 
+    // config.nacos.group
     private static String getNacosGroup() {
-        return FILE_CONFIG.getConfig(getNacosGroupKey(), DEFAULT_GROUP);
+        String nacosGroupKey = getNacosGroupKey();
+        // System.out.println("nacosGroupKey = " + nacosGroupKey);
+        return FILE_CONFIG.getConfig(nacosGroupKey, DEFAULT_GROUP);
     }
 
+    // config.nacos.dataId
     private static String getNacosDataId() {
-        return FILE_CONFIG.getConfig(getNacosDataIdKey(), DEFAULT_DATA_ID);
+        return FILE_CONFIG.getConfig(getNacosDataIdKey(), DEFAULT_DATA_ID); // seata.properties
     }
 
     private static String getSeataConfigStr() {
@@ -295,10 +344,19 @@ public class NacosConfiguration extends AbstractConfiguration {
         return sb.toString();
     }
 
+    // 加载 nacos 注册中心的 seata 配置文件: 默认为 seata.properties
+    // 如果想要修改文件名, 需要设置 registry.conf 中的 config.nacos.dataId 属性,
+    // 其值即表示 seata 配置文件名
+
+    /**
+     * @see #getLatestConfig(String, String, long)
+     */
     private static void initSeataConfig() {
         try {
+            // key: config.nacos.dataId, 默认值: seata.properties
             String nacosDataId = getNacosDataId();
             String config = configService.getConfig(nacosDataId, getNacosGroup(), DEFAULT_CONFIG_TIMEOUT);
+            LOGGER.info("load seata-config from nacos-server, nacos-data-id[{}], config-content: \r\n{}", nacosDataId, config);
             if (StringUtils.isNotBlank(config)) {
                 try (Reader reader = new InputStreamReader(new ByteArrayInputStream(config.getBytes()), StandardCharsets.UTF_8)) {
                     seataConfig.load(reader);

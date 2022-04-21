@@ -15,25 +15,23 @@
  */
 package io.seata.server.storage.redis;
 
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Set;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import io.seata.common.util.ConfigTools;
 import io.seata.common.exception.RedisException;
+import io.seata.common.util.ConfigTools;
 import io.seata.common.util.StringUtils;
 import io.seata.config.Configuration;
 import io.seata.config.ConfigurationFactory;
 import io.seata.core.constants.ConfigurationKeys;
-
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.JedisPoolAbstract;
 import redis.clients.jedis.JedisPoolConfig;
 import redis.clients.jedis.JedisSentinelPool;
+
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * @author funkye
@@ -60,6 +58,8 @@ public class JedisPooledFactory {
 
     private static final int SENTINEL_HOST_NUMBER = 3;
 
+    // registry.conf 文件中定义的 config.type 属性值的配置对象: nacos 时就是
+    // io.seata.config.nacos.NacosConfiguration
     private static final Configuration CONFIGURATION = ConfigurationFactory.getInstance();
 
     /**

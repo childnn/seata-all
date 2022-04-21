@@ -15,6 +15,8 @@
  */
 package io.seata.rm.tcc.api;
 
+import io.seata.rm.tcc.interceptor.ActionContextUtil;
+
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -54,6 +56,8 @@ public @interface BusinessActionContextParameter {
     int index() default -1;
 
     /**
+     * 将该注解标注在 entity 的属性上
+     * @see ActionContextUtil#fetchContextFromObject(java.lang.Object)
      * if get the parameter from the property of the object ?
      *
      * @return boolean boolean

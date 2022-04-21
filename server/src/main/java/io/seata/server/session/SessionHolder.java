@@ -15,12 +15,6 @@
  */
 package io.seata.server.session;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Iterator;
-import java.util.List;
-
 import io.seata.common.exception.ShouldNeverHappenException;
 import io.seata.common.exception.StoreException;
 import io.seata.common.loader.EnhancedServiceLoader;
@@ -35,12 +29,13 @@ import io.seata.core.store.StoreMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Iterator;
+import java.util.List;
 
-import static io.seata.common.Constants.ASYNC_COMMITTING;
-import static io.seata.common.Constants.RETRY_COMMITTING;
-import static io.seata.common.Constants.RETRY_ROLLBACKING;
-import static io.seata.common.Constants.TX_TIMEOUT_CHECK;
-import static io.seata.common.Constants.UNDOLOG_DELETE;
+import static io.seata.common.Constants.*;
 
 /**
  * The type Session holder.
@@ -93,7 +88,7 @@ public class SessionHolder {
             mode = CONFIG.getConfig(ConfigurationKeys.STORE_MODE);
         }
         StoreMode storeMode = StoreMode.get(mode);
-        if (StoreMode.DB.equals(storeMode)) {
+        if (StoreMode.DB.equals(storeMode)) { // db
             ROOT_SESSION_MANAGER = EnhancedServiceLoader.load(SessionManager.class, StoreMode.DB.getName());
             ASYNC_COMMITTING_SESSION_MANAGER = EnhancedServiceLoader.load(SessionManager.class, StoreMode.DB.getName(),
                 new Object[] {ASYNC_COMMITTING_SESSION_MANAGER_NAME});
@@ -101,7 +96,7 @@ public class SessionHolder {
                 new Object[] {RETRY_COMMITTING_SESSION_MANAGER_NAME});
             RETRY_ROLLBACKING_SESSION_MANAGER = EnhancedServiceLoader.load(SessionManager.class, StoreMode.DB.getName(),
                 new Object[] {RETRY_ROLLBACKING_SESSION_MANAGER_NAME});
-        } else if (StoreMode.FILE.equals(storeMode)) {
+        } else if (StoreMode.FILE.equals(storeMode)) { // file
             String sessionStorePath = CONFIG.getConfig(ConfigurationKeys.STORE_FILE_DIR,
                 DEFAULT_SESSION_STORE_FILE_DIR);
             if (StringUtils.isBlank(sessionStorePath)) {
@@ -115,7 +110,7 @@ public class SessionHolder {
                 new Class[] {String.class, String.class}, new Object[] {RETRY_COMMITTING_SESSION_MANAGER_NAME, null});
             RETRY_ROLLBACKING_SESSION_MANAGER = EnhancedServiceLoader.load(SessionManager.class, StoreMode.FILE.getName(),
                 new Class[] {String.class, String.class}, new Object[] {RETRY_ROLLBACKING_SESSION_MANAGER_NAME, null});
-        } else if (StoreMode.REDIS.equals(storeMode)) {
+        } else if (StoreMode.REDIS.equals(storeMode)) { // redis
             ROOT_SESSION_MANAGER = EnhancedServiceLoader.load(SessionManager.class, StoreMode.REDIS.getName());
             ASYNC_COMMITTING_SESSION_MANAGER = EnhancedServiceLoader.load(SessionManager.class,
                 StoreMode.REDIS.getName(), new Object[] {ASYNC_COMMITTING_SESSION_MANAGER_NAME});

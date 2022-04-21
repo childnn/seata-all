@@ -37,6 +37,7 @@ public class ParameterParser {
     private static final String PROGRAM_NAME
         = "sh seata-server.sh(for linux and mac) or cmd seata-server.bat(for windows)";
 
+    // -h -p -m -n -e
     @Parameter(names = "--help", help = true)
     private boolean help;
     @Parameter(names = {"--host", "-h"}, description = "The ip to register to registry center.", order = 1)
@@ -80,9 +81,17 @@ public class ParameterParser {
             if (StringUtils.isNotBlank(seataEnv)) {
                 System.setProperty(ENV_PROPERTY_KEY, seataEnv);
             }
+
+            // 如果在启动参数中没有指定 storeMode(-m 配置记录点) 才会 执行此 if
             if (StringUtils.isBlank(storeMode)) {
-                storeMode = ConfigurationFactory.getInstance().getConfig(ConfigurationKeys.STORE_MODE,
-                    SERVER_DEFAULT_STORE_MODE);
+                // todo: 重要!!!
+                // ConfigurationFactory-static code-block
+                //  static {
+                //         load();
+                //     }
+                storeMode = ConfigurationFactory.getInstance() // 1. load; 2. getInstance; 3. getConfig
+                        // store.mode, default: file
+                        .getConfig(ConfigurationKeys.STORE_MODE, SERVER_DEFAULT_STORE_MODE); // 代理: io.seata.config.ConfigurationCache.proxy
             }
         } catch (ParameterException e) {
             printError(e);

@@ -15,10 +15,6 @@
  */
 package io.seata.server;
 
-import java.io.IOException;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
 import io.seata.common.XID;
 import io.seata.common.thread.NamedThreadFactory;
 import io.seata.common.util.NetUtil;
@@ -34,12 +30,20 @@ import io.seata.server.session.SessionHolder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+
 /**
  * The type Server.
  *
  * @author slievrly
+ * 1. 加载 registry.conf: 其中定义了 seata 的注册中心和配置中心
+ * 2.
  */
 public class Server {
+
     /**
      * The entry point of application.
      *
@@ -57,9 +61,15 @@ public class Server {
             logger.info("The server is running in container.");
         }
 
+        // io.seata.server.ParameterParser.init JVM 启动参数
+        // 如果没有设置启动参数, 则会去 Configuration 获取
         //initialize the parameter parser
         //Note that the parameter parser should always be the first line to execute.
         //Because, here we need to parse the parameters needed for startup.
+        // init-method: 在 init 中又加载 io.seata.config.ConfigurationFactory
+        // ConfigurationFactory 中又有 静态代码块, 加载各种配置
+        // 1. 加载 registry.conf: 主要属性 registry.type/config.type
+        // 2. 加载 config.type 的属性值对应的 config: 如 配置中心为 nacos 则使用 io.seata.config.nacos.NacosConfiguration
         ParameterParser parameterParser = new ParameterParser(args);
 
         //initialize the metrics
@@ -76,9 +86,12 @@ public class Server {
         //server port
         nettyRemotingServer.setListenPort(parameterParser.getPort());
         UUIDGenerator.init(parameterParser.getServerNode());
-        //log store mode : file, db, redis
+        //
+        // io.seata.core.store.StoreMode: data-id='store.mode', ignore case
+        // log store mode : file, db, redis
         SessionHolder.init(parameterParser.getStoreMode());
 
+        // TC
         DefaultCoordinator coordinator = new DefaultCoordinator(nettyRemotingServer);
         coordinator.init();
         nettyRemotingServer.setHandler(coordinator);

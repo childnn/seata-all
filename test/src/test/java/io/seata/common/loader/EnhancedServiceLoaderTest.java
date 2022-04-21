@@ -26,9 +26,14 @@ import java.util.List;
  */
 public class EnhancedServiceLoaderTest {
 
+    /**
+     * @see LoadLevel#order()
+     */
     @Test
     public void testLoadBeanByOrder(){
-        LoaderTestSPI loader  = EnhancedServiceLoader.load(LoaderTestSPI.class, EnhancedServiceLoaderTest.class.getClassLoader());
+        // 获取 order 最大的实现
+        LoaderTestSPI loader  = EnhancedServiceLoader.load(LoaderTestSPI.class,
+                EnhancedServiceLoaderTest.class.getClassLoader());
         System.out.println(loader.echo());
         Assertions.assertEquals("impl_2", loader.echo());
     }

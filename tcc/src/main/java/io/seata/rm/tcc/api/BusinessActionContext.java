@@ -25,11 +25,11 @@ public class BusinessActionContext implements Serializable {
 
     private static final long serialVersionUID = 6539226288677737991L;
 
-    private String xid;
+    private String xid; // 全局事务 ID
 
-    private String branchId;
+    private String branchId; // 分支事务 ID
 
-    private String actionName;
+    private String actionName; // bean-name
 
     private Map<String, Object> actionContext;
 

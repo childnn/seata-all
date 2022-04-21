@@ -15,21 +15,6 @@
  */
 package io.seata.common.loader;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Enumeration;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-import java.util.stream.Collectors;
-
 import io.seata.common.Constants;
 import io.seata.common.executor.Initialize;
 import io.seata.common.util.CollectionUtils;
@@ -37,10 +22,27 @@ import org.apache.commons.lang.exception.ExceptionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
+import java.util.ArrayList;
+import java.util.Enumeration;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
 /**
  * The type Enhanced service loader.
  *
  * @author slievrly
+ * @see java.util.ServiceLoader#load(Class, ClassLoader)
+ * 根据指定的 service 名(接口) 查找
  */
 public class EnhancedServiceLoader {
 
@@ -61,7 +63,7 @@ public class EnhancedServiceLoader {
      * load service provider
      *
      * @param <S>     the type parameter
-     * @param service the service
+     * @param service the service 接口.class
      * @return s s
      * @throws EnhancedServiceNotFoundException the enhanced service not found exception
      */
@@ -115,9 +117,11 @@ public class EnhancedServiceLoader {
     /**
      * Load s.
      *
-     * @param <S>          the type parameter
-     * @param service      the service
-     * @param activateName the activate name
+     * @param <S>          the type parameter 接口类型
+     * @param service      the service, 待加载的服务, 实际就是接口的实现(解析注解 @LoadLevel 得到)
+     *      {@link InnerEnhancedServiceLoader#getUnloadedExtensionDefinition(java.lang.String, java.lang.ClassLoader)}
+     *      {@link LoadLevel#name()}
+     * @param activateName the activate name 接口的实现名
      * @param argsType     the args type
      * @param args         the args
      * @return the s
@@ -187,6 +191,11 @@ public class EnhancedServiceLoader {
     }
 
 
+    /**
+     * 对接口的 wrapper
+     * @param <S> 接口类型
+     * 每一个 service 都单独加载
+     */
     private static class InnerEnhancedServiceLoader<S> {
         private static final Logger LOGGER = LoggerFactory.getLogger(InnerEnhancedServiceLoader.class);
         private static final String SERVICES_DIRECTORY = "META-INF/services/";
@@ -195,11 +204,18 @@ public class EnhancedServiceLoader {
         private static final ConcurrentMap<Class<?>, InnerEnhancedServiceLoader<?>> SERVICE_LOADERS =
                 new ConcurrentHashMap<>();
 
-        private final Class<S> type;
+        private final Class<S> type; // service 接口, 作为待加载的文件名
+        // service 实现集
         private final Holder<List<ExtensionDefinition>> definitionsHolder = new Holder<>();
+
         private final ConcurrentMap<ExtensionDefinition, Holder<Object>> definitionToInstanceMap =
                 new ConcurrentHashMap<>();
+        /**
+         * key: {@link LoadLevel#name()}
+         */
         private final ConcurrentMap<String, List<ExtensionDefinition>> nameToDefinitionsMap = new ConcurrentHashMap<>();
+
+        // key: service-class, name-标注有 @LoadLevel 注解的 key 实现的封装
         private final ConcurrentMap<Class<?>, ExtensionDefinition> classToDefinitionMap = new ConcurrentHashMap<>();
 
         private InnerEnhancedServiceLoader(Class<S> type) {
@@ -212,12 +228,16 @@ public class EnhancedServiceLoader {
          * @param type the type of the extension point
          * @param <S>  the type
          * @return the service loader
+         * @see CollectionUtils#computeIfAbsent(Map, Object, Function)
          */
+        @SuppressWarnings("unchecked")
         private static <S> InnerEnhancedServiceLoader<S> getServiceLoader(Class<S> type) {
             if (type == null) {
                 throw new IllegalArgumentException("Enhanced Service type == null");
             }
-            return (InnerEnhancedServiceLoader<S>)CollectionUtils.computeIfAbsent(SERVICE_LOADERS, type,
+            // InnerEnhancedServiceLoader<?> i = SERVICE_LOADERS.computeIfAbsent(type, k -> new InnerEnhancedServiceLoader<>(type));
+            // return ((InnerEnhancedServiceLoader<S>) i);
+            return (InnerEnhancedServiceLoader<S>) CollectionUtils.computeIfAbsent(SERVICE_LOADERS, type,
                 key -> new InnerEnhancedServiceLoader<>(type));
         }
 
@@ -326,12 +346,19 @@ public class EnhancedServiceLoader {
             return loadAllExtensionClass(loader);
         }
 
+        /**
+         * @see #loadExtension(String, ClassLoader, Class[], Object[])
+         * @param loader
+         * @param argTypes
+         * @param args
+         * @return
+         */
         @SuppressWarnings("rawtypes")
         private S loadExtension(ClassLoader loader, Class[] argTypes,
                                 Object[] args) {
             try {
                 loadAllExtensionClass(loader);
-                ExtensionDefinition defaultExtensionDefinition = getDefaultExtensionDefinition();
+                ExtensionDefinition defaultExtensionDefinition = getDefaultExtensionDefinition(); // 默认排序最后一个, order 值最大的
                 return getExtensionInstance(defaultExtensionDefinition, loader, argTypes, args);
             } catch (Throwable e) {
                 if (e instanceof EnhancedServiceNotFoundException) {
@@ -344,6 +371,14 @@ public class EnhancedServiceLoader {
             }
         }
 
+        /**
+         * @see #loadExtension(ClassLoader, Class[], Object[])
+         * @param activateName
+         * @param loader
+         * @param argTypes
+         * @param args
+         * @return
+         */
         @SuppressWarnings("rawtypes")
         private S loadExtension(String activateName, ClassLoader loader, Class[] argTypes,
                                 Object[] args) {
@@ -365,6 +400,7 @@ public class EnhancedServiceLoader {
             }
         }
 
+        @SuppressWarnings("unchecked")
         private S getExtensionInstance(ExtensionDefinition definition, ClassLoader loader, Class[] argTypes,
                                        Object[] args) {
             if (definition == null) {
@@ -392,8 +428,7 @@ public class EnhancedServiceLoader {
         private S createNewExtension(ExtensionDefinition definition, ClassLoader loader, Class[] argTypes, Object[] args) {
             Class<?> clazz = definition.getServiceClass();
             try {
-                S newInstance = initInstance(clazz, argTypes, args);
-                return newInstance;
+                return initInstance(clazz, argTypes, args);
             } catch (Throwable t) {
                 throw new IllegalStateException("Extension instance(definition: " + definition + ", class: " +
                         type + ")  could not be instantiated: " + t.getMessage(), t);
@@ -411,15 +446,16 @@ public class EnhancedServiceLoader {
                     }
                 }
             }
-            return definitions.stream().map(def -> def.getServiceClass()).collect(Collectors.toList());
+            // 返回
+            return definitions.stream().map(ExtensionDefinition::getServiceClass).collect(Collectors.toList());
         }
 
-        @SuppressWarnings("rawtypes")
+        // @SuppressWarnings("rawtypes")
         private List<ExtensionDefinition> findAllExtensionDefinition(ClassLoader loader) {
             List<ExtensionDefinition> extensionDefinitions = new ArrayList<>();
             try {
-                loadFile(SERVICES_DIRECTORY, loader, extensionDefinitions);
-                loadFile(SEATA_DIRECTORY, loader, extensionDefinitions);
+                loadFile(SERVICES_DIRECTORY, loader, extensionDefinitions); // META-INF/services/
+                loadFile(SEATA_DIRECTORY, loader, extensionDefinitions); // META-INF/seata/
             } catch (IOException e) {
                 throw new EnhancedServiceNotFoundException(e);
             }
@@ -427,7 +463,7 @@ public class EnhancedServiceLoader {
             //After loaded all the extensions,sort the caches by order
             if (!nameToDefinitionsMap.isEmpty()) {
                 for (List<ExtensionDefinition> definitions : nameToDefinitionsMap.values()) {
-                    Collections.sort(definitions, (def1, def2) -> {
+                    definitions.sort((def1, def2) -> {
                         int o1 = def1.getOrder();
                         int o2 = def2.getOrder();
                         return Integer.compare(o1, o2);
@@ -436,7 +472,7 @@ public class EnhancedServiceLoader {
             }
 
             if (!extensionDefinitions.isEmpty()) {
-                Collections.sort(extensionDefinitions, (definition1, definition2) -> {
+                extensionDefinitions.sort((definition1, definition2) -> {
                     int o1 = definition1.getOrder();
                     int o2 = definition2.getOrder();
                     return Integer.compare(o1, o2);
@@ -447,10 +483,16 @@ public class EnhancedServiceLoader {
         }
 
 
-        @SuppressWarnings("rawtypes")
+        /**
+         *
+         * @param dir {@link #SERVICES_DIRECTORY} {@link #SEATA_DIRECTORY}
+         * @param loader The ClassLoader
+         * @param extensions 容器
+         */
+        // @SuppressWarnings("rawtypes")
         private void loadFile(String dir, ClassLoader loader, List<ExtensionDefinition> extensions)
                 throws IOException {
-            String fileName = dir + type.getName();
+            String fileName = dir + type.getName(); // META-INF/services/接口名(文件名)
             Enumeration<java.net.URL> urls;
             if (loader != null) {
                 urls = loader.getResources(fileName);
@@ -460,16 +502,20 @@ public class EnhancedServiceLoader {
             if (urls != null) {
                 while (urls.hasMoreElements()) {
                     java.net.URL url = urls.nextElement();
+                    LOGGER.info("load file: {}", url);
                     try (BufferedReader reader = new BufferedReader(new InputStreamReader(url.openStream(), Constants.DEFAULT_CHARSET))) {
                         String line;
                         while ((line = reader.readLine()) != null) {
-                            final int ci = line.indexOf('#');
+                            final int ci = line.indexOf('#'); // 排除注释
                             if (ci >= 0) {
                                 line = line.substring(0, ci);
                             }
-                            line = line.trim();
+                            // line 即为 class name
+                            line = line.trim(); // 去掉空格
                             if (line.length() > 0) {
+                                LOGGER.info("load the instance of [{}]-[{}] from [{}]", type, line, url);
                                 try {
+                                    // 解析实现类上的 @LoadLevel 注解
                                     ExtensionDefinition extensionDefinition = getUnloadedExtensionDefinition(line, loader);
                                     if (extensionDefinition == null) {
                                         if (LOGGER.isDebugEnabled()) {
@@ -490,6 +536,9 @@ public class EnhancedServiceLoader {
             }
         }
 
+        /**
+         * @see LoadLevel
+         */
         private ExtensionDefinition getUnloadedExtensionDefinition(String className, ClassLoader loader)
             throws ClassNotFoundException {
             //Check whether the definition has been loaded

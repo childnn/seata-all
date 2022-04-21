@@ -16,19 +16,20 @@
 
 package io.seata.config;
 
+import io.seata.common.util.DurationUtil;
+import io.seata.common.util.StringUtils;
+import net.sf.cglib.proxy.Enhancer;
+import net.sf.cglib.proxy.MethodInterceptor;
+
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
-import io.seata.common.util.DurationUtil;
-import io.seata.common.util.StringUtils;
-import net.sf.cglib.proxy.Enhancer;
-import net.sf.cglib.proxy.MethodInterceptor;
-
 /**
  * @author funkye
+ * cglib 代理: 缓存 dataId 值, 监听变化并刷新缓存
  */
 public class ConfigurationCache implements ConfigurationChangeListener {
 
@@ -84,29 +85,38 @@ public class ConfigurationCache implements ConfigurationChangeListener {
         }
     }
 
+    /**
+     * 代理 {@link Configuration} 的 getXxx 方法(除了 io.seata.config.Configuration#getLatestConfig(java.lang.String, java.lang.String, long))
+     * @see ObjectWrapper#supportType(java.lang.String)
+     * @see io.seata.spring.boot.autoconfigure.provider.SpringBootConfigurationProvider
+     * @param originalConfiguration {@link Configuration}
+     * 调用点 {@link ConfigurationFactory#buildConfiguration()}
+     */
     public Configuration proxy(Configuration originalConfiguration) {
-        return (Configuration)Enhancer.create(Configuration.class,
-            (MethodInterceptor)(proxy, method, args, methodProxy) -> {
-                if (method.getName().startsWith(METHOD_PREFIX)
-                        && !method.getName().equalsIgnoreCase(METHOD_LATEST_CONFIG)) {
-                    String rawDataId = (String)args[0];
-                    ObjectWrapper wrapper = CONFIG_CACHE.get(rawDataId);
-                    String type = method.getName().substring(METHOD_PREFIX.length());
-                    if (!ObjectWrapper.supportType(type)) {
-                        type = null;
-                    }
-                    if (null == wrapper) {
-                        Object result = method.invoke(originalConfiguration, args);
-                        // The wrapper.data only exists in the cache when it is not null.
-                        if (result != null) {
-                            wrapper = new ObjectWrapper(result, type);
-                            CONFIG_CACHE.put(rawDataId, wrapper);
+        return (Configuration) Enhancer.create(Configuration.class,
+                (MethodInterceptor) (proxy, method, args, methodProxy) -> {
+                    // get 方法且不为 io.seata.config.Configuration#getLatestConfig
+                    if (method.getName().startsWith(METHOD_PREFIX)
+                            && !method.getName().equalsIgnoreCase(METHOD_LATEST_CONFIG)) {
+                        // 参数一都是 dataId
+                        String rawDataId = (String) args[0];
+                        ObjectWrapper wrapper = CONFIG_CACHE.get(rawDataId);
+                        String type = method.getName().substring(METHOD_PREFIX.length());
+                        if (!ObjectWrapper.supportType(type)) {
+                            type = null;
                         }
+                        if (null == wrapper) {
+                            Object result = method.invoke(originalConfiguration, args);
+                            // The wrapper.data only exists in the cache when it is not null.
+                            if (result != null) {
+                                wrapper = new ObjectWrapper(result, type);
+                                CONFIG_CACHE.put(rawDataId, wrapper);
+                            }
+                        }
+                        return wrapper == null ? null : wrapper.convertData(type);
                     }
-                    return wrapper == null ? null : wrapper.convertData(type);
-                }
-                return method.invoke(originalConfiguration, args);
-            });
+                    return method.invoke(originalConfiguration, args);
+                });
     }
 
     private static class ConfigurationCacheInstance {

@@ -16,6 +16,7 @@
 package io.seata.common;
 
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 
 /**
  * The type Constants.
@@ -114,7 +115,7 @@ public interface Constants {
     /**
      * default charset is utf-8
      */
-    Charset DEFAULT_CHARSET = Charset.forName(DEFAULT_CHARSET_NAME);
+    Charset DEFAULT_CHARSET = StandardCharsets.UTF_8;//Charset.forName(DEFAULT_CHARSET_NAME);
     /**
      * The constant OBJECT_KEY_SPRING_APPLICATION_CONTEXT
      */

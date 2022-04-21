@@ -39,7 +39,7 @@ public class LocalTCCRemotingParserTest {
      */
     @Test
     public void testServiceParser(){
-        // 父接口表有 @LocalTcc
+        // 父接口标有 @LocalTcc
         TccActionImpl tccAction = new TccActionImpl();
 
         boolean result = localTCCRemotingParser.isService(tccAction, "a");

@@ -15,10 +15,10 @@
  */
 package io.seata.rm.datasource.exec;
 
-import com.mysql.jdbc.ResultSetImpl;
-import com.mysql.jdbc.util.ResultSetUtil;
+// import com.mysql.jdbc.ResultSetImpl;
+// import com.mysql.jdbc.util.ResultSetUtil;
 import io.seata.common.exception.ShouldNeverHappenException;
-import io.seata.common.util.ReflectionUtil;
+// import io.seata.common.util.ReflectionUtil;
 import io.seata.rm.datasource.ConnectionProxy;
 import io.seata.rm.datasource.DataSourceProxy;
 import io.seata.rm.datasource.PreparedStatementProxy;
@@ -53,11 +53,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static org.mockito.Mockito.anyString;
-import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 /**
  * @author guoyao, jsbxyyx
